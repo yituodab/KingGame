@@ -1,0 +1,122 @@
+<html>
+	<head>
+		<title>Yituodab的个人网站</title>
+		<meta charset="utf-8">
+	</head>
+	<body onload="init()">
+		<script>
+		window.addEventListener("unload",exit);
+		function init(){
+			cookies = document.cookie;
+			document.getElementById("request").style.visibility = "hidden";
+			document.getElementById("wait").style.visibility = "hidden";
+			fetch(
+				"/getPlayerList",{
+					method: "POST",
+					body: "{{id}},"+cookies.substring(cookies.indexOf("=")+1),
+					headers: {'Content-Type': 'text/plain'}
+				}
+			).then(response => {
+				response.text().then(text => {
+					var innerText = "房间玩家：\n"
+					var list = new Array();
+					var nextName = text;
+					while(nextName.indexOf(",")!=-1){
+						var name = nextName.substring(0,text.indexOf(","));
+						nextName = nextName.substring(text.indexOf(",")+1);
+						list.push(name);
+					}
+					list.push(nextName);
+					list.forEach(name => {
+						innerText = innerText + name + "\n";
+					});
+					document.getElementById("playerList").innerText = innerText;
+				});
+			})
+			.catch(error => console.error(error));
+		}
+		function exit(){
+			cookies = document.cookie;
+			fetch(
+				"/exitRoom",{
+					method: "POST",
+					body: "{{id}},"+cookies.substring(cookies.indexOf("=")+1),
+					headers: {'Content-Type': 'text/plain'}
+				}
+			)
+		}
+		</script>
+		<h1 style="font-size:500%;text-align:center;">房间ID：{{id}}</h1>
+		<hr>
+		<br>
+		<h1 id="number" style="font-size:200%;text-align:center;">你的序号：</h1>
+		<div style="text-align:center;">
+    	<br>
+		<h1 id="playerList" style="font-size:200%;text-align:center;">房间玩家：</h1>
+		<button id="request" onclick="request();" style="width:500px;height:100px">输入要求</button>
+		<h1 id="demand">要求：无</h1>
+		<var id="finished" style="visibility: hidden;">false</var>
+    	<script>
+		function startGame(){
+			document.getElementById("start").style.visibility = 'hidden';
+			document.getElementById("wait").style.visibility = "visibility";
+			document.getElementById("finished").innerText = 'false';
+			update();
+		}
+		function request(){
+			var Request = prompt("请输入要求");
+			if(Request == null){
+				return;
+			}
+			fetch(
+				"/request", {
+					method: "POST",
+					body: "{{id}},"+Request,
+					headers: {'Content-Type': 'text/plain'}
+				}
+			).catch(error => console.log(error));
+		}
+        function update() {
+			cookies = document.cookie;
+            fetch(
+                "/update", {
+                	method: "POST", 
+            		body: "{{id}},"+cookies.substring(cookies.indexOf("=")+1),
+             		headers: {'Content-Type': 'text/plain'},
+        		}
+			).then(response => {
+				response.text().then(text => {
+					var bool = text.substring(0,text.indexOf(","));
+					if(bool == "true"){
+						document.getElementById("wait").style.visibility = "hidden";
+						var str = text.substring(text.indexOf(",")+1);
+						var status = str.substring(0,str.indexOf(","));
+						var info = str.substring(str.indexOf(",")+1);
+						if(status == "1"){
+							document.getElementById("number").innerText = "你的序号：" + info;
+							if(info == "King"){
+								document.getElementById("request").style.visibility = "visible";
+							}
+						}
+						else if(status == "2"){
+							document.getElementById("request").style.visibility = "hidden";
+							document.getElementById("demand").innerText = "要求："+info;
+							clearTimeout();
+							document.getElementById("finished").innerText = 'true';
+						}
+					}
+				});
+				}
+			).catch(error => console.log(error));
+			if(document.getElementById("finished").innerText == 'true'){
+				clearTimeout();
+				setTimeout(update,1000);
+			}
+        }
+    </script>
+	<br>
+	<button id="start" onclick="startGame();">准备</button>
+	<h1 id="wait" style="font-size:200%;text-align:center;">等待其他玩家...</h1>
+	</div>
+	</body>
+</html>

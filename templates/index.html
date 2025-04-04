@@ -1,0 +1,74 @@
+<html>
+	<head>
+		<title>Yituodab的个人网站</title>
+		<meta charset="utf-8">
+	</head>
+	<body onload="refrushUserName()">
+		<div style="text-align:center;">
+		<h1 style="font-size:1000%;">加入房间</h1>
+		<hr>
+		<script>
+		function refrushUserName(){
+			cookies = document.cookie;
+			name = cookies.substring(cookies.indexOf("=") + 1);
+			if(name == ""){
+				name = "Unknown"
+			}
+			document.getElementById("name").innerText = "你的名字：" + name;
+		}
+		</script>
+		<h1 style="font-size:200%;text-align:center;" id="name">你的名字：Unknown</h1>
+    	<button onclick="setUserName();" style="width:200px;height:50px">修改名字</button>
+		<br>
+    	<button onclick="join(prompt('房间ID'));" style="width:500px;height:100px">加入房间</button>
+		<br>
+		<button onclick="addRoom();" style="width:500px;height:100px;text-align:center;">新建房间</button>
+		</div>
+    	<script>
+		function setUserName(){
+			var name = prompt("请输入你的名字");
+			if(name == null || name == ""){
+				name = "Unknown";
+			}
+			document.cookie = "username=" + name + ";path=/";
+			refrushUserName();
+		}
+        function join(text) {
+			cookies = document.cookie;
+			if(text == null){
+				return;
+			}
+            fetch(
+                "/joinRoom", {
+                	method: "POST",  
+            		body: text+","+cookies.substring(cookies.indexOf("=") + 1),
+                	headers: {'Content-Type': 'text/plain'},
+            	}
+			).then(response => {
+				response.text().then(number => {
+					console.log(number);
+					if(number == "not found"){
+						alert("Not Found!");
+						return;
+					}
+					location.href = "/room/"+number;
+					});
+				}
+			);
+        }
+		function addRoom() {
+            fetch(
+                "/addRoom", {
+                	method: "POST",
+            	}
+			).then(response => {
+				response.text().then(text => {
+					console.log(text);
+					join(text);
+					});
+				}
+			);
+        }
+    </script>
+	</body>
+</html>
