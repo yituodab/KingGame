@@ -47,6 +47,10 @@
 			).then(response => {
 				response.text().then(number => {
 					console.log(number);
+					if(number == "Started"){
+						alert("Game is running!")
+						return;
+					}
 					if(number == "not found"){
 						alert("Not Found!");
 						return;

@@ -2,6 +2,11 @@ from flask import *
 import random
 import os
 main = Flask(__name__)
+def makeResponse(data:str)->Response:
+    response = Response()
+    response.headers["Content-Type"] = "text/plain"
+    response.data = data
+    return response
 class Player():
     __ready = False
     __name = ""
@@ -13,6 +18,9 @@ class Player():
         return self.__ready
     def ready(self, ready:bool):
         self.__ready = ready
+        if(not ready):
+            self.__number = 0
+            self.__isKing = False
     def getName(self) -> str:
         return self.__name
     def getNumber(self) -> int:
@@ -52,12 +60,13 @@ class Room():
             i = i + 1
         self.players[random.randint(0,len(self.players)-1)].king(True)
         self.__started = True
-    def started(self) -> bool:
-        return self.__started
+        self.__request = None
     def end(self):
         for player in self.players:
             player.ready(False)
-            player.setNumber(0)
+        self.__started = False
+    def started(self) -> bool:
+        return self.__started
     def ready(self,name:str):
         for player in self.players:
             if player.getName() == name:
@@ -96,18 +105,20 @@ def joinRoom():
     data = request.data.decode("utf-8")
     roomNumber = int(data[0:data.find(",")])
     playerName = data[data.find(",")+1:len(data)]
+    info = str(roomNumber)
+    if roomNumber > Room.Id:
+        info = "not found"
+        response = Response()
+        response.headers["Content-Type"] = "text/plain"
+        response = info
+        return response
     room = roomList[roomNumber-1]
+    info = str(roomNumber)
     if not room.hasPlayer(playerName):
         player = Player(playerName)
-        player.ready(True)
         room.addPlayer(player)
-    response = Response()
-    response.headers["Content-Type"] = "text/plain"
-    if roomNumber <= Room.Id:
-        response.data = str(roomNumber)
-    else:
-        response.data = "not found"
-    return response
+    print(playerName + " Join Room " + str(roomNumber))
+    return makeResponse(info)
 @main.route('/exitRoom', methods=["POST"])
 def exitRoom():
     data = request.data.decode("utf-8")
@@ -118,48 +129,47 @@ def exitRoom():
         player = room.getPlayer(playerName)
         player.ready(False)
         room.deletePlayer(player)
-    response = Response()
-    response.headers["Content-Type"] = "text/plain"
-    if roomNumber <= Room.Id:
-        response.data = str(roomNumber)
-    else:
-        response.data = "not found"
-    return response
+    print(playerName + " Exit Room " + str(roomNumber))
+    return "OK"
 @main.route('/addRoom', methods=["POST"])
 def addRoom():
     room = Room()
     roomList.append(room)
-    response = Response()
-    response.headers["Content-Type"] = "text/plain"
-    response.data = str(room.getId())
-    return response
-@main.route('/update', methods=["POST"])
-def update():
+    return makeResponse(str(room.getId()))
+@main.route("/ready",methods=["POST"])
+def ready():
     data = request.data.decode("utf-8")
+    returnData = "OK"
     playerName = data[data.find(",")+1:len(data)]
     roomNumber = int(data[0:data.find(",")])
     room = roomList[roomNumber-1]
-    response = Response()
-    response.headers["Content-Type"] = "text/plain"
-    returnData = "false,0,Waiting other players"
+    getPlayer = room.getPlayer(playerName)
+    if getPlayer == None:
+        returnData = "Error:No player \""+playerName+"\" have been found in the current room"
+        return makeResponse(returnData)
+    getPlayer.ready(True)
+    return makeResponse(returnData)
+@main.route('/update', methods=["POST"])
+def update():
+    data = request.data.decode("utf-8")
+    returnData = "false,0,waiting"
+    playerName = data[data.find(",")+1:len(data)]
+    roomNumber = int(data[0:data.find(",")])
+    room = roomList[roomNumber-1]
+    getPlayer = room.getPlayer(playerName)
+    if getPlayer == None:
+        returnData = "true,0,No player \""+playerName+"\" have been found in the current room"
+        return makeResponse(returnData)
     if room.isReady():
         if not room.started():
             room.start()
-        returnData = "true"
-        getPlayer = room.getPlayer(playerName)
-        if getPlayer == None:
-            returnData = "false,0,null"
         returnData = "true,1,"+str(getPlayer.getNumber())
         if getPlayer.isKing():
             returnData = "true,1,King"
+        return makeResponse(returnData)
     if room.hasRequest():
         returnData = "true,2,"+room.getRequest()
-        getPlayer = room.getPlayer(playerName)
-        if getPlayer == None:
-            returnData = "false,0,null"
-        getPlayer.ready(False)
-    response.data = returnData
-    return response
+    return makeResponse(returnData)
 @main.route('/request', methods=["POST"])
 def Request():
     data = request.data.decode("utf-8")
@@ -167,8 +177,9 @@ def Request():
     kingRequest = data[data.find(",")+1:len(data)]
     room = roomList[roomNumber-1]
     room.setRequest(kingRequest)
+    room.end()
     return "OK"
-@main.route('/room/<int:id>')
+@main.route('/room/<int:id>',methods=["GET"])
 def room(id:int):
     if len(roomList) < id:
         return "Room Not Found"
@@ -181,15 +192,17 @@ def getPlayerList():
     playerName = data[data.find(",")+1:len(data)]
     if not room.hasPlayer(playerName):
         player = Player(playerName)
-        player.ready(True)
         room.addPlayer(player)
     playerList = ''
     for player in room.getPlayers():
-        playerList = playerList + player.getName() + ','
+        number = player.getNumber()
+        playerList = playerList + player.getName() + ' ' + (str(number) if number != 0 else ' ') + ','
     playerList = playerList[0:len(playerList)-1]
-    response = Response()
-    response.headers["Content-Type"] = "text/plain"
-    response.data = playerList
-    return response
+    return makeResponse(playerList)
 main.debug = True
-main.run(port=11451)
+import sys
+args = sys.argv[1:]
+for arg in args:
+    if arg == "undebug":
+        main.debug = False
+main.run(host="0.0.0.0",port=11451)
